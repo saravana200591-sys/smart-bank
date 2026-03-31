@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -8,7 +8,7 @@ import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 // Contexts
 import { AuthProvider, AuthContext } from './src/context/AuthContext';
 import { ModeProvider, ModeContext } from './src/context/ModeContext';
-import { BankProvider } from './src/context/BankContext';
+import { BankProvider, BankContext } from './src/context/BankContext';
 
 // Screens (placeholders)
 import SplashScreen from './src/screens/SplashScreen';
@@ -20,7 +20,12 @@ import ReceiveScreen from './src/screens/ReceiveScreen';
 import TransactionsScreen from './src/screens/TransactionsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import PinSetupScreen from './src/screens/PinSetupScreen';
+import AppUnlockScreen from './src/screens/AppUnlockScreen';
 import VoiceAssistant from './src/components/VoiceAssistant';
+
+import { registerForPushNotificationsAsync } from './src/services/notificationService';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -53,6 +58,18 @@ const MainTabs = () => {
 const RootNavigator = () => {
   const { user, loading: authLoading } = useContext(AuthContext);
   const { userData, isLoading: bankLoading } = useContext(BankContext);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      registerForPushNotificationsAsync().then(token => {
+        if (token) {
+          const userRef = doc(db, 'users', user.uid);
+          updateDoc(userRef, { pushToken: token }).catch(console.error);
+        }
+      });
+    }
+  }, [user]);
 
   if (authLoading || (user && bankLoading)) {
     return (
@@ -74,6 +91,8 @@ const RootNavigator = () => {
         <Stack.Screen name="ModeSelect" component={ModeSelectScreen} />
       ) : !userData?.pin ? (
         <Stack.Screen name="PinSetup" component={PinSetupScreen} />
+      ) : !isUnlocked ? (
+        <Stack.Screen name="AppUnlock" component={AppUnlockScreen} initialParams={{ setIsUnlocked }} />
       ) : (
         // Authenticated Stack
         <>
